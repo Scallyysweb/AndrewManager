@@ -5,8 +5,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Only enable on desktop devices
     if (!('ontouchstart' in window) && window.innerWidth > 768) {
         document.addEventListener('mousemove', (e) => {
-            cursorLight.style.left = e.clientX + 'px';
-            cursorLight.style.top = e.clientY + 'px';
+            // Use GPU-accelerated transform instead of left/top
+            cursorLight.style.transform = `translate3d(${e.clientX - 300}px, ${e.clientY - 300}px, 0)`;
         });
     } else {
         cursorLight.style.display = 'none';
@@ -34,17 +34,63 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     });
 });
 
-// Enhanced navbar on scroll
+// Throttle function for performance optimization
+function throttle(func, delay) {
+    let lastCall = 0;
+    return function(...args) {
+        const now = Date.now();
+        if (now - lastCall >= delay) {
+            lastCall = now;
+            func.apply(this, args);
+        }
+    };
+}
+
+// Unified scroll handler - combines navbar, sections reveal, and nav active state
 const nav = document.querySelector('.nav');
-window.addEventListener('scroll', () => {
-    if (window.pageYOffset > 100) {
+const sections = document.querySelectorAll('.section');
+const navLinks = document.querySelectorAll('.nav-link');
+
+const handleScroll = throttle(() => {
+    const scrollPos = window.pageYOffset;
+
+    // 1. Enhanced navbar on scroll
+    if (scrollPos > 100) {
         nav.style.background = 'rgba(0, 0, 0, 0.85)';
         nav.style.boxShadow = '0 4px 24px rgba(0, 0, 0, 0.5)';
     } else {
         nav.style.background = 'rgba(0, 0, 0, 0.6)';
         nav.style.boxShadow = 'none';
     }
-});
+
+    // 2. Smooth reveal sections on scroll
+    sections.forEach(section => {
+        const rect = section.getBoundingClientRect();
+        const isVisible = rect.top < window.innerHeight * 0.75;
+
+        if (isVisible) {
+            section.style.opacity = '1';
+        }
+    });
+
+    // 3. Navigation active state
+    let current = '';
+    sections.forEach(section => {
+        const sectionTop = section.offsetTop;
+        if (scrollPos >= sectionTop - 200) {
+            current = section.getAttribute('id');
+        }
+    });
+
+    navLinks.forEach(link => {
+        link.style.color = 'var(--ink-gray)';
+        if (link.getAttribute('href') === `#${current}`) {
+            link.style.color = 'var(--ink-white)';
+        }
+    });
+}, 16); // ~60fps
+
+window.addEventListener('scroll', handleScroll, { passive: true });
 
 // FAQ Accordion
 document.querySelectorAll('.faq-item-new').forEach(item => {
@@ -78,8 +124,8 @@ const observerOptions = {
 const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
         if (entry.isIntersecting) {
-            entry.target.style.opacity = '1';
-            entry.target.style.transform = 'translateY(0)';
+            // Add 'visible' class instead of inline styles for clean separation of concerns
+            entry.target.classList.add('visible');
             observer.unobserve(entry.target);
         }
     });
@@ -90,9 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const animatedElements = document.querySelectorAll('.service-card-compact, .advantage-card, .income-card, .cta-big-card');
 
     animatedElements.forEach(el => {
-        el.style.opacity = '0';
-        el.style.transform = 'translateY(30px)';
-        el.style.transition = 'opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)';
+        // No need to set inline styles - CSS handles initial state
         observer.observe(el);
     });
 
@@ -102,8 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const items = grid.querySelectorAll('.service-card-compact, .advantage-card');
         items.forEach((item, index) => {
             setTimeout(() => {
-                item.style.opacity = '1';
-                item.style.transform = 'translateY(0)';
+                item.classList.add('visible');
             }, index * 100);
         });
     });
@@ -115,60 +158,25 @@ document.querySelectorAll('.marquee-content').forEach(marquee => {
     marquee.parentElement.appendChild(clone);
 });
 
-// Add hover effects to cards
-document.querySelectorAll('.service-card-compact, .advantage-card').forEach(card => {
-    card.addEventListener('mouseenter', function() {
-        this.style.transform = 'translateY(-8px)';
-    });
-
-    card.addEventListener('mouseleave', function() {
-        this.style.transform = 'translateY(0)';
-    });
-});
-
-// Button hover effects
+// Button hover effects with accurate ripple position
 document.querySelectorAll('.hero-cta, .nav-cta, .faq-cta, .cta-big-button').forEach(button => {
-    button.addEventListener('mouseenter', function(e) {
+    button.addEventListener('click', function(e) {
         const ripple = document.createElement('span');
+        const rect = this.getBoundingClientRect();
+
+        // Calculate accurate click position relative to button
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const size = Math.max(rect.width, rect.height);
+
+        ripple.style.width = ripple.style.height = size + 'px';
+        ripple.style.left = (x - size / 2) + 'px';
+        ripple.style.top = (y - size / 2) + 'px';
         ripple.classList.add('ripple-effect');
+
         this.appendChild(ripple);
 
         setTimeout(() => ripple.remove(), 600);
-    });
-});
-
-// Smooth reveal on scroll
-window.addEventListener('scroll', () => {
-    const sections = document.querySelectorAll('.section');
-    sections.forEach(section => {
-        const rect = section.getBoundingClientRect();
-        const isVisible = rect.top < window.innerHeight * 0.75;
-
-        if (isVisible) {
-            section.style.opacity = '1';
-        }
-    });
-});
-
-// Navigation active state
-const sections = document.querySelectorAll('.section');
-const navLinks = document.querySelectorAll('.nav-link');
-
-window.addEventListener('scroll', () => {
-    let current = '';
-
-    sections.forEach(section => {
-        const sectionTop = section.offsetTop;
-        if (window.pageYOffset >= sectionTop - 200) {
-            current = section.getAttribute('id');
-        }
-    });
-
-    navLinks.forEach(link => {
-        link.style.color = 'var(--ink-gray)';
-        if (link.getAttribute('href') === `#${current}`) {
-            link.style.color = 'var(--ink-white)';
-        }
     });
 });
 
